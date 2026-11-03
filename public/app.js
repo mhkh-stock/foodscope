@@ -1,4 +1,4 @@
-// FoodScope SPA — dark dashboard, blue accents, WebAudio clicks + voice tour.
+// FoodScope SPA — yellow theme (warm dark surfaces, yellow accents), WebAudio clicks + voice tour.
 let soundOn = localStorage.getItem('fs_sound') !== 'off';
 let csrfToken = null, me = null, vendorsCache = [];
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
@@ -40,7 +40,7 @@ async function api(method, path, body){
 async function refreshMe(){
   try{ const j = await fetch('/api/auth/me',{credentials:'include'}).then(r=>r.json()); me=j.user; csrfToken=j.csrfToken||csrfToken; }catch(e){ me=null; }
   const box=document.getElementById('whoBox');
-  box.innerHTML = me ? `Hi, ${esc(me.name)} (${esc(me.role)}) <button class="small ghost" onclick="logout()">Log out</button>` : '<span class="muted">Not logged in</span>';
+  box.innerHTML = me ? `Hi, ${esc(me.name)} (${esc(me.role)}) <a href="#/account">Change password</a> <button class="small ghost" onclick="logout()">Log out</button>` : '<span class="muted">Not logged in</span>';
 }
 async function logout(){ try{ await api('POST','/api/auth/logout',{}); }catch(e){} me=null; location.hash='#/'; render(); }
 function animateCounters(){
@@ -53,12 +53,12 @@ function animateCounters(){
 function drawChart(canvas, labels, values){
   if(!canvas) return; const ctx=canvas.getContext('2d');
   const W=canvas.width=canvas.offsetWidth*2, H=canvas.height=440;
-  ctx.clearRect(0,0,W,H); ctx.fillStyle='#0e1830'; ctx.fillRect(0,0,W,H);
+  ctx.clearRect(0,0,W,H); ctx.fillStyle='rgba(31,25,9,.55)'; ctx.fillRect(0,0,W,H);
   const max=Math.max(1,...values); const bw=W/(values.length*1.6);
   values.forEach((v,i)=>{ const h=(v/max)*(H-90); const x=20+i*(bw*1.6)+10;
-    ctx.fillStyle='#3b82f6'; ctx.fillRect(x,H-50-h,bw,h);
-    ctx.fillStyle='#e8eefc'; ctx.font='22px sans-serif'; ctx.fillText(String(v),x,H-60-h);
-    ctx.fillStyle='#93a4c4'; ctx.font='20px sans-serif'; ctx.fillText(String(labels[i]).slice(5),x,H-18);
+    ctx.fillStyle='#facc15'; ctx.fillRect(x,H-50-h,bw,h);
+    ctx.fillStyle='#fef9c3'; ctx.font='22px sans-serif'; ctx.fillText(String(v),x,H-60-h);
+    ctx.fillStyle='#c8b586'; ctx.font='20px sans-serif'; ctx.fillText(String(labels[i]).slice(5),x,H-18);
   });
 }
 function stars(n){ if(n==null) return '<span class="muted">No ratings yet</span>'; return '★'.repeat(Math.round(n))+'☆'.repeat(5-Math.round(n))+' '+n+'/5'; }
@@ -81,6 +81,7 @@ async function render(){
     if(route==='register') return renderRegister();
     if(route==='manager') return renderManager();
     if(route==='admin') return renderAdmin();
+    if(route==='account') return renderAccount();
     app.innerHTML='<p>Page not found. <a href="#/">Back to directory</a></p>';
   }catch(e){ app.innerHTML=`<div class="err">${esc(e.message)}</div>`; }
 }
@@ -159,6 +160,23 @@ window.postReview=async(e,id,delEnabled)=>{ e.preventDefault(); const f=e.target
   if(delEnabled && f.delivery.value) body.delivery=+f.delivery.value;
   try{ const j=await api('POST','/api/reviews',body); document.getElementById('revMsg').textContent=' ✓ Review saved ('+j.status+').'; renderVendor(id); }
   catch(err){ document.getElementById('revMsg').textContent=' ✗ '+err.message; } };
+async function fileToBase64(file){
+  if(!file) return null;
+  const buf = await file.arrayBuffer();
+  let bin=''; const bytes=new Uint8Array(buf);
+  for(let i=0;i<bytes.length;i++) bin+=String.fromCharCode(bytes[i]);
+  return btoa(bin);
+}
+function renderAccount(){
+  if(!me){ app.innerHTML='<p>Please <a href="#/login">log in</a> first to change your password.</p>'; return; }
+  app.innerHTML=`<h1>Account — Change password</h1><div class="panel"><p class="muted">Logged in as ${esc(me.name)} (${esc(me.role)}). Changing your password keeps this session and signs out your other sessions.</p>
+  <form onsubmit="doChangePassword(event)"><label>Old password</label><input name="old_password" type="password" required>
+  <label>New password (8+ characters)</label><input name="new_password" type="password" required>
+  <button style="margin-top:10px">Change password</button><span id="cpMsg" class="muted"></span></form></div>`;
+}
+window.doChangePassword=async(e)=>{ e.preventDefault(); const f=e.target;
+  try{ const j=await api('POST','/api/auth/change-password',{old_password:f.old_password.value,new_password:f.new_password.value}); document.getElementById('cpMsg').textContent=' ✓ '+j.message; f.reset(); }
+  catch(err){ document.getElementById('cpMsg').textContent=' ✗ '+err.message; } };
 function renderStatic(title, html){ app.innerHTML=`<h1>${title}</h1><div class="panel">${html}</div>`; }
 function renderContact(){
   app.innerHTML=`<h1>Contact FoodScope</h1><div class="panel"><form onsubmit="sendContact(event)">
@@ -252,7 +270,8 @@ async function renderManager(){
     <div class="row"><div><label>Plan</label><select name="plan"><option>Basic</option><option>Premium</option><option>Featured</option></select></div>
     <div><label>Method</label><select name="method"><option>Bank Transfer</option><option>Easypaisa</option><option>JazzCash</option><option>Sadapay</option><option>Nayapay</option><option>Manual Reference</option></select></div>
     <div><label>Reference / transaction ID</label><input name="reference_text" required></div></div>
-    <p class="muted">Basic 30 days PKR 1,500 · Premium 90 days PKR 4,500 · Featured 90 days PKR 9,000. Proof upload (PNG/JPEG/PDF, under 5 MB) is optional in this form — paste a file as base64 via the API for a stored proof file.</p>
+    <label>Payment proof file (PNG/JPEG/PDF, under 5 MB, optional)</label><input name="proof_file" type="file" accept=".png,.jpg,.jpeg,.pdf">
+    <p class="muted">Basic 30 days PKR 1,500 · Premium 90 days PKR 4,500 · Featured 90 days PKR 9,000. Proof is checked by MIME type and file signature on the server.</p>
     <button>Submit payment</button><span id="payMsg" class="muted"></span></form>
     <h4>Payments</h4>${v.payments.map(p=>`<p>${esc(p.plan)} — PKR ${p.amount_pkr} — ${esc(p.method)} — ${esc(p.status)}</p>`).join('')||'<p class="muted">No payments yet.</p>'}</div>
   <div class="panel"><h3>Sensitive-field update request</h3><p class="muted">Name, Google Maps URL, delivery phone, image URLs and slug can only change after admin approval.</p>
@@ -260,25 +279,41 @@ async function renderManager(){
   <h4>Update requests</h4>${v.update_requests.map(r=>`<p>#${r.id} — ${esc(r.status)} — ${esc(r.fields_json)}</p>`).join('')||'<p class="muted">None yet.</p>'}</div>
   <div class="panel"><h3>Add menu item</h3><form onsubmit="addMenu(event)"><div class="row"><div><label>Name</label><input name="name" required></div><div><label>Price (PKR)</label><input name="price_pkr" type="number" required></div></div><button style="margin-top:10px">Add item</button></form>
   <h4>Menu</h4>${v.menu.map(m=>`<div class="menu-item"><span>${esc(m.name)} — PKR ${m.price_pkr}</span><span>${m.available?'Available':'Unavailable'} <button class="small" onclick="mgrToggle(${m.id},${m.available?0:1})">Toggle</button></span></div>`).join('')}</div>
-  <div class="panel"><h3>Certificates</h3><form onsubmit="addCert(event,${v.id})"><label>Certificate type</label><input name="cert_type" required placeholder="e.g. Food Licence"><button style="margin-top:10px">Submit certificate</button><span id="certMsg" class="muted"></span></form>
-  ${v.certificates.map(c=>`<p>${esc(c.cert_type)} — ${esc(c.status)}</p>`).join('')||'<p class="muted">No certificates yet.</p>'}</div>`;
+  <div class="panel"><h3>Certificates</h3><form onsubmit="addCert(event,${v.id})"><label>Certificate type</label><input name="cert_type" required placeholder="e.g. Food Licence"><label>Certificate file (PNG/JPEG/PDF, under 5 MB, optional)</label><input name="cert_file" type="file" accept=".png,.jpg,.jpeg,.pdf"><button style="margin-top:10px">Submit certificate</button><span id="certMsg" class="muted"></span></form>
+  ${v.certificates.map(c=>`<p>${esc(c.cert_type)} — ${esc(c.status)}</p>`).join('')||'<p class="muted">No certificates yet.</p>'}</div>
+  <div class="panel"><h3>Gallery photo (needs admin approval before it shows publicly)</h3><form onsubmit="addGallery(event)"><label>Image URL</label><input name="url" required placeholder="https://…"><label>Caption</label><input name="caption"><button style="margin-top:10px">Submit gallery photo</button><span id="galMsg" class="muted"></span></form>
+  <h4>Gallery</h4>${v.gallery.map(g=>`<p>${esc(g.url.slice(0,60))} — ${esc(g.status)}</p>`).join('')||'<p class="muted">No gallery photos yet.</p>'}</div>
+  <div class="panel"><h3>Add staff (menu/availability only, for this vendor)</h3><form onsubmit="addStaff(event)"><label>Staff name</label><input name="name" required><label>Staff email</label><input name="email" type="email" required><label>Staff password (8+ characters)</label><input name="password" type="password" required><button style="margin-top:10px">Add staff</button><span id="staffMsg" class="muted"></span></form>
+  <p class="muted">Staff can only manage menu and availability for this vendor — never vendor details, payments or admin routes.</p></div>`;
   window.payPlan=async(e,id)=>{ e.preventDefault(); const f=e.target;
-    try{ const j=await api('POST','/api/manager/payments',{plan:f.plan.value,method:f.method.value,reference_text:f.reference_text.value,vendor_id:id}); document.getElementById('payMsg').textContent=' ✓ Payment submitted (PKR '+j.amount_pkr+', pending admin approval).'; renderManager(); }
+    try{ const body={plan:f.plan.value,method:f.method.value,reference_text:f.reference_text.value,vendor_id:id};
+      const file=f.proof_file.files[0];
+      if(file){ body.proof_filename=file.name; body.proof_mimetype=file.type; body.proof_base64=await fileToBase64(file); }
+      const j=await api('POST','/api/manager/payments',body); document.getElementById('payMsg').textContent=' ✓ Payment submitted (PKR '+j.amount_pkr+', pending admin approval).'; renderManager(); }
     catch(err){ document.getElementById('payMsg').textContent=' ✗ '+err.message; } };
+  window.addGallery=async(e)=>{ e.preventDefault(); const f=e.target;
+    try{ await api('POST','/api/manager/gallery',{url:f.url.value,caption:f.caption.value}); renderManager(); }catch(err){ document.getElementById('galMsg').textContent=' ✗ '+err.message; } };
+  window.addStaff=async(e)=>{ e.preventDefault(); const f=e.target;
+    try{ const j=await api('POST','/api/manager/staff',{name:f.name.value,email:f.email.value,password:f.password.value}); document.getElementById('staffMsg').textContent=' ✓ Staff added (id '+j.staffId+').'; f.reset(); }
+    catch(err){ document.getElementById('staffMsg').textContent=' ✗ '+err.message; } };
   window.updateReq=async(e,id)=>{ e.preventDefault(); const f=e.target; const body={}; if(f.name.value) body.name=f.name.value; if(f.google_maps_url.value) body.google_maps_url=f.google_maps_url.value;
     try{ await api('POST','/api/manager/vendors/'+id+'/update-request',body); renderManager(); }catch(err){ document.getElementById('urMsg').textContent=' ✗ '+err.message; } };
   window.addMenu=async(e)=>{ e.preventDefault(); const f=e.target;
     try{ await api('POST','/api/manager/menu',{name:f.name.value,price_pkr:+f.price_pkr.value}); renderManager(); }catch(err){ alert(err.message); } };
   window.mgrToggle=async(id,avail)=>{ await api('PATCH','/api/manager/menu/'+id,{available:!!avail}); renderManager(); };
   window.addCert=async(e,id)=>{ e.preventDefault(); const f=e.target;
-    try{ await api('POST','/api/manager/certificates',{cert_type:f.cert_type.value,vendor_id:id}); renderManager(); }catch(err){ document.getElementById('certMsg').textContent=' ✗ '+err.message; } };
+    try{ const body={cert_type:f.cert_type.value,vendor_id:id};
+      const file=f.cert_file.files[0];
+      if(file){ body.file_filename=file.name; body.file_mimetype=file.type; body.file_base64=await fileToBase64(file); }
+      await api('POST','/api/manager/certificates',body); renderManager(); }catch(err){ document.getElementById('certMsg').textContent=' ✗ '+err.message; } };
 }
 async function renderAdmin(){
   if(!me){ app.innerHTML='<p>Please <a href="#/login">log in</a> as the Portal Admin first.</p>'; return; }
   if(me.role!=='owner'){ app.innerHTML='<div class="err">Admin panel is for the Portal Admin (owner) only. Your role: '+esc(me.role)+'</div>'; return; }
-  const [rep, vendors, pays, reqs, reviews, auditLog] = await Promise.all([
+  const [rep, vendors, pays, reqs, reviews, auditLog, certs, gallery, users, contacts] = await Promise.all([
     api('GET','/api/admin/reports'), api('GET','/api/admin/vendors'), api('GET','/api/admin/payments'),
     api('GET','/api/admin/update-requests'), api('GET','/api/admin/reviews'), api('GET','/api/admin/audit-log'),
+    api('GET','/api/admin/certificates'), api('GET','/api/admin/gallery'), api('GET','/api/admin/users'), api('GET','/api/admin/contacts'),
   ]).catch(e=>{ app.innerHTML=`<div class="err">${esc(e.message)}</div>`; return []; });
   if(!rep) return;
   const t=rep.totals;
@@ -297,10 +332,17 @@ async function renderAdmin(){
     <button class="small" onclick="adminVendor(${v.id},'approve')">Approve</button>
     <button class="small ghost" onclick="adminVendorReason(${v.id},'reject')">Reject</button>
     <button class="small danger" onclick="adminVendorReason(${v.id},'suspend')">Suspend</button>
-    <button class="small ghost" onclick="adminVendor(${v.id},'unsuspend')">Unsuspend</button></td></tr>`).join('')}</table></div>
+    <button class="small ghost" onclick="adminVendor(${v.id},'unsuspend')">Unsuspend</button>
+    <button class="small ghost" onclick="adminEmergencyEdit(${v.id})">Emergency edit</button>
+    <button class="small danger" onclick="adminEmergencyDelete(${v.id})">Emergency delete</button></td></tr>`).join('')}</table>
+  <p class="muted">Emergency edit/delete both require a safety reason (5+ characters) and are audit-logged.</p></div>
+  <div class="panel"><h3>Certificates</h3>${certs.certificates.map(c=>`<p>#${c.id} ${esc(c.manager_name)} — ${esc(c.cert_type)} — ${esc(c.status)} ${c.status==='pending'?`<button class="small" onclick="adminCert(${c.id},'approve')">Approve</button> <button class="small ghost" onclick="adminCert(${c.id},'reject')">Reject</button>`:''}</p>`).join('')||'<p class="muted">No certificates.</p>'}</div>
+  <div class="panel"><h3>Gallery images (pending approval)</h3>${gallery.gallery.filter(g=>g.status==='pending').map(g=>`<p>#${g.id} ${esc(g.vendor_name)} — ${esc(g.url.slice(0,60))} <button class="small" onclick="adminGallery(${g.id},'approve')">Approve</button> <button class="small ghost" onclick="adminGallery(${g.id},'reject')">Reject</button></p>`).join('')||'<p class="muted">No pending gallery images.</p>'}</div>
+  <div class="panel"><h3>Users — suspend / activate</h3>${users.users.map(u=>`<p>#${u.id} ${esc(u.name)} (${esc(u.email||u.phone||'')}) — ${esc(u.role)} — ${esc(u.status)} ${u.role!=='owner'?`<button class="small ghost" onclick="adminUser(${u.id},'suspend')">Suspend</button> <button class="small" onclick="adminUser(${u.id},'activate')">Activate</button>`:''}</p>`).join('')}</div>
+  <div class="panel"><h3>Contact messages</h3>${contacts.contacts.slice(0,20).map(c=>`<p>${esc(c.name)} (${esc(c.email)}) — ${esc(c.subject)}: ${esc(c.message.slice(0,100))}</p>`).join('')||'<p class="muted">No contact messages.</p>'}</div>
   <div class="panel"><h3>Payments</h3>${pays.payments.map(p=>`<p>#${p.id} ${esc(p.manager_name)} — ${esc(p.plan)} PKR ${p.amount_pkr} — ${esc(p.method)} — ${esc(p.status)} ${p.status==='pending'?`<button class="small" onclick="adminPay(${p.id},'approve')">Approve</button> <button class="small ghost" onclick="adminPay(${p.id},'reject')">Reject</button>`:''}</p>`).join('')||'<p class="muted">No payments.</p>'}</div>
   <div class="panel"><h3>Update requests</h3>${reqs.requests.map(r=>`<p>#${r.id} ${esc(r.vendor_name)} — ${esc(r.status)} — ${esc(r.fields_json)} ${r.status==='pending'?`<button class="small" onclick="adminUpd(${r.id},'approve')">Approve</button> <button class="small ghost" onclick="adminUpd(${r.id},'reject')">Reject</button>`:''}</p>`).join('')||'<p class="muted">None.</p>'}</div>
-  <div class="panel"><h3>Reviews — moderation</h3>${reviews.reviews.slice(0,20).map(r=>`<p>#${r.id} ${esc(r.vendor_name)} — ${esc(r.customer_name)} — ${esc(r.status)} — ${esc(r.comment.slice(0,80))} <button class="small ghost" onclick="adminReview(${r.id},'delete')">Soft-delete</button> <button class="small" onclick="adminReview(${r.id},'restore')">Restore (admin only)</button></p>`).join('')||'<p class="muted">No reviews.</p>'}</div>
+  <div class="panel"><h3>Reviews — moderation</h3>${reviews.reviews.slice(0,20).map(r=>`<p>#${r.id} ${esc(r.vendor_name)} — ${esc(r.customer_name)} — ${esc(r.status)} — ${esc(r.comment.slice(0,80))} <button class="small ghost" onclick="adminReviewNote(${r.id})">Add note</button> <button class="small ghost" onclick="adminReviewReply(${r.id})">Reply</button> <button class="small ghost" onclick="adminReview(${r.id},'delete')">Soft-delete</button> <button class="small" onclick="adminReview(${r.id},'restore')">Restore (admin only)</button></p>`).join('')||'<p class="muted">No reviews.</p>'}</div>
   <div class="panel"><h3>Audit log (latest)</h3>${auditLog.log.slice(0,30).map(a=>`<p class="muted">${esc(a.created_at)} — ${esc(a.action)} — ${esc(a.target_type||'')} #${a.target_id??''} ${a.reason?esc('· '+a.reason):''}</p>`).join('')}</div>`;
   animateCounters();
   window.adminVendor=async(id,act)=>{ await api('POST',`/api/admin/vendors/${id}/${act}`,{}); renderAdmin(); };
@@ -308,6 +350,13 @@ async function renderAdmin(){
   window.adminPay=async(id,act)=>{ const body={}; if(act==='reject'){ const r=prompt('Rejection reason:'); if(!r) return; body.reason=r; } await api('POST',`/api/admin/payments/${id}/${act}`,body); renderAdmin(); };
   window.adminUpd=async(id,act)=>{ const body={}; if(act==='reject'){ const r=prompt('Rejection reason:'); if(!r) return; body.reason=r; } await api('POST',`/api/admin/update-requests/${id}/${act}`,body); renderAdmin(); };
   window.adminReview=async(id,act)=>{ await api('POST',`/api/admin/reviews/${id}/${act}`,{reason:'Moderated from admin panel'}); renderAdmin(); };
+  window.adminCert=async(id,act)=>{ const body={}; if(act==='reject'){ const r=prompt('Rejection reason:'); if(!r) return; body.reason=r; } await api('POST',`/api/admin/certificates/${id}/${act}`,body); renderAdmin(); };
+  window.adminGallery=async(id,act)=>{ await api('POST',`/api/admin/gallery/${id}/${act}`,{}); renderAdmin(); };
+  window.adminUser=async(id,act)=>{ await api('POST',`/api/admin/users/${id}/${act}`,{}); renderAdmin(); };
+  window.adminReviewNote=async(id)=>{ const note=prompt('Admin note for this review:'); if(!note) return; await api('POST',`/api/admin/reviews/${id}/note`,{note}); renderAdmin(); };
+  window.adminReviewReply=async(id)=>{ const reply=prompt('Admin reply to this review:'); if(!reply) return; await api('POST',`/api/admin/reviews/${id}/reply`,{reply}); renderAdmin(); };
+  window.adminEmergencyEdit=async(id)=>{ const reason=prompt('Safety reason for emergency edit (5+ characters, required):'); if(!reason) return; const name=prompt('New vendor name (leave blank to keep current):'); const fields={}; if(name) fields.name=name; if(!Object.keys(fields).length){ alert('No field entered — nothing changed.'); return; } await api('POST',`/api/admin/vendors/${id}/emergency-edit`,{reason,fields}); renderAdmin(); };
+  window.adminEmergencyDelete=async(id)=>{ const reason=prompt('Safety reason for emergency DELETE (5+ characters, required):'); if(!reason) return; if(!confirm('Delete this vendor permanently?')) return; await api('DELETE',`/api/admin/vendors/${id}`,{reason}); renderAdmin(); };
 }
 window.addEventListener('hashchange', render);
 render();

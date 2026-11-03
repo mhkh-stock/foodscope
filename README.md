@@ -9,9 +9,26 @@ Only approved vendors with a current, unexpired subscription appear publicly.
 - Port **3010** (override with `PORT`)
 - SQLite file `foodscope.sqlite` (WAL mode, foreign keys ON) — git-ignored
 - Single-page frontend: `public/index.html` + `public/app.js` + `public/styles.css`
-- Dark-mode dashboard style with blue accents, left sidebar, animated counters,
-  activity chart, WebAudio click sounds and a voice-tour button (sound on/off toggle).
-  No cream/red/gold styling.
+- Yellow theme (original FoodScope theme): warm dark surfaces with yellow/gold
+  accents, left sidebar, animated counters, activity chart, WebAudio click sounds
+  and a voice-tour button (sound on/off toggle). Palette: background #161203,
+  panels #221c08 / #2d2510, borders #4d4216, text #fef9c3, muted #c8b586,
+  primary yellow #facc15, bright yellow #fde047, hover yellow #eab308, dark
+  text on yellow buttons #1c1500, badge #3d3208 / #fde047. Layout, components,
+  sidebar/board positions and text are unchanged — only colours changed.
+
+Glass treatment (same yellow palette, same layout): panels, cards, vendor
+cards, sidebar and topbar are translucent — panel rgba(34,28,8,.72),
+panel2 rgba(45,37,16,.60), topbar rgba(16,13,3,.72), inputs/badges/canvas
+rgba(31,25,9,.70) / rgba(61,50,8,.70) — with `backdrop-filter: blur(14px)
+saturate(1.25)` (8px on inputs/badges), light yellow borders
+rgba(253,224,71,.28), a soft top-edge reflection
+`inset 0 1px 0 rgba(253,224,71,.18)` and a faint top yellow gradient glow.
+Primary buttons stay solid yellow with dark text so they stay fully
+readable; text colours are unchanged (#fef9c3 on the near-black warm
+background), so contrast is preserved. There is no modal component in
+this frontend (admin confirmations use native prompts), so glass applies
+to panels/cards/sidebar/topbar/inputs/badges/canvas.
 
 ## Run locally (exact steps)
 
@@ -45,6 +62,23 @@ Seeded manager accounts (for testing) use password `Manager@2026!`
 `Customer@2026!`. Seeded vendors include approved listings in Peshawar,
 Karachi (Burns Road), Lahore and Islamabad, plus two pending listings that
 correctly do **not** appear publicly.
+
+## Required manager account (fresh-DB verified)
+
+- Name: **M. Hashir**
+- Email: **mhkhan943223@gmail.com**
+- Password: **Manager@2026!** (change after first login)
+- Role: manager, verified, with **no vendor yet** — so this account can submit
+  a vendor end-to-end (submit → payment → menu → admin approval → public).
+
+## Change password (admin, manager, customer, staff)
+
+Log in, then open **Change password** in the sidebar (or `#/account`).
+Enter the old password and a new password of 8+ characters.
+The endpoint is `POST /api/auth/change-password` — authenticated only,
+CSRF-protected, old-password checked; it keeps your current session and
+revokes your other sessions. Demo passwords above must still be changed
+after first login.
 
 ## Verification codes — development mode only
 
@@ -131,9 +165,9 @@ prepared SQL statements, foreign keys ON, WAL mode.
 ```
 server.js            All API + auth + validation
 package.json         start: node server.js
-public/index.html    SPA shell (dark dashboard, sidebar)
+public/index.html    SPA shell (yellow-theme dashboard, sidebar)
 public/app.js        SPA routes, counters, chart, sounds, voice tour
-public/styles.css    Dark theme, blue accents
+public/styles.css    Yellow theme (see palette above)
 sql/schema.sql       SQLite schema (also applied by server.js on boot)
 .gitignore           Excludes .env, *.sqlite*, uploads/, node_modules/
 START_FOODSCOPE_APP.bat  Windows one-click start

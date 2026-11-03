@@ -232,6 +232,10 @@ function seed() {
   mgr.sweets = createUserSeed({ name: 'Haji Rafiq', email: 'sweet.palace.lahore@gmail.com', contact_type: 'email', role: 'manager', password: 'Manager@2026!', verified: 1 });
   mgr.pending1 = createUserSeed({ name: 'Bilal Sheikh', email: 'bilal.fastfood.khi@gmail.com', contact_type: 'email', role: 'manager', password: 'Manager@2026!', verified: 1 });
   mgr.pending2 = createUserSeed({ name: 'Usman Ghani', email: 'usman.chinese.isb@gmail.com', contact_type: 'email', role: 'manager', password: 'Manager@2026!', verified: 1 });
+  // Required manager account (verified 2026-11-03 on the VM test copy, re-seeded here
+  // so it works on a fresh DB). Intentionally has NO vendor yet, so the manager can
+  // submit one end-to-end. Name is M. Hashir — the admin name is M. Hashir everywhere.
+  mgr.hashir = createUserSeed({ name: 'M. Hashir', email: 'mhkhan943223@gmail.com', contact_type: 'email', role: 'manager', password: 'Manager@2026!', verified: 1 });
   // Customers
   const cust = {};
   const customers = [
@@ -446,6 +450,21 @@ async function handle(req, res) {
         setCookie(res, 'fs_session', '', { httpOnly: true, expires: 'Thu, 01 Jan 1970 00:00:00 GMT' });
         return sendJSON(res, 200, { ok: true });
       }
+      if (method === 'POST' && pathname === '/api/auth/change-password') {
+        const auth = requireAuth(req, res, null); if (!auth) return;
+        const { old_password, new_password } = body;
+        if (!old_password || !new_password || String(new_password).length < 8)
+          return sendJSON(res, 400, { error: 'Old password and a new password of 8+ characters are required' });
+        if (auth.user.password_hash !== hashPassword(old_password, auth.user.salt))
+          return sendJSON(res, 401, { error: 'Old password is incorrect' });
+        const salt = randToken(16);
+        db.prepare('UPDATE users SET password_hash=?, salt=? WHERE id=?').run(hashPassword(new_password, salt), salt, auth.user.id);
+        // Keep the current session alive; revoke every other session for safety.
+        if (auth.session) db.prepare('DELETE FROM sessions WHERE user_id=? AND id!=?').run(auth.user.id, auth.session.id);
+        else db.prepare('DELETE FROM sessions WHERE user_id=?').run(auth.user.id);
+        audit(auth.user, 'change_password', 'user', auth.user.id, null, null);
+        return sendJSON(res, 200, { ok: true, message: 'Password changed. Use the new password next time you log in.' });
+      }
       if (method === 'GET' && pathname === '/api/auth/me') {
         const { user, session } = getSessionUser(req);
         if (!user) return sendJSON(res, 200, { user: null });
@@ -460,7 +479,7 @@ async function handle(req, res) {
         const list = all.filter(isPublicVendor).filter((v) => {
           if (cat && v.category !== cat) return false;
           if (city && !v.city.toLowerCase().includes(city)) return false;
-          if (q && !(v.name.toLowerCase().includes(q) || (v.description || '').toLowerCase().includes(q) || v.city.toLowerCase().includes(q) || v.area.toLowerCase().includes(q))) return false;
+          if (q && !(v.name.toLowerCase().includes(q) || (v.description || '').toLowerCase().includes(q) || v.city.toLowerCase().includes(q) || (v.area || '').toLowerCase().includes(q))) return false;
           return true;
         }).map(vendorPublic);
         return sendJSON(res, 200, { vendors: list });
