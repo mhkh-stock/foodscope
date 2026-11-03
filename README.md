@@ -9,26 +9,21 @@ Only approved vendors with a current, unexpired subscription appear publicly.
 - Port **3010** (override with `PORT`)
 - SQLite file `foodscope.sqlite` (WAL mode, foreign keys ON) — git-ignored
 - Single-page frontend: `public/index.html` + `public/app.js` + `public/styles.css`
-- Yellow theme (original FoodScope theme): warm dark surfaces with yellow/gold
-  accents, left sidebar, animated counters, activity chart, WebAudio click sounds
-  and a voice-tour button (sound on/off toggle). Palette: background #161203,
-  panels #221c08 / #2d2510, borders #4d4216, text #fef9c3, muted #c8b586,
-  primary yellow #facc15, bright yellow #fde047, hover yellow #eab308, dark
-  text on yellow buttons #1c1500, badge #3d3208 / #fde047. Layout, components,
-  sidebar/board positions and text are unchanged — only colours changed.
-
-Glass treatment (same yellow palette, same layout): panels, cards, vendor
-cards, sidebar and topbar are translucent — panel rgba(34,28,8,.72),
-panel2 rgba(45,37,16,.60), topbar rgba(16,13,3,.72), inputs/badges/canvas
-rgba(31,25,9,.70) / rgba(61,50,8,.70) — with `backdrop-filter: blur(14px)
-saturate(1.25)` (8px on inputs/badges), light yellow borders
-rgba(253,224,71,.28), a soft top-edge reflection
-`inset 0 1px 0 rgba(253,224,71,.18)` and a faint top yellow gradient glow.
-Primary buttons stay solid yellow with dark text so they stay fully
-readable; text colours are unchanged (#fef9c3 on the near-black warm
-background), so contrast is preserved. There is no modal component in
-this frontend (admin confirmations use native prompts), so glass applies
-to panels/cards/sidebar/topbar/inputs/badges/canvas.
+- Food-app frontend (final version): Foodpanda-style public home — hero with
+  big search bar and city selector, horizontally scrolling category rail with
+  arrows, vendor cards in horizontal scrolling rows with large photos, plus a
+  full grid below. Cheezious-style theme: near-black background (#0d0d0d),
+  bold red primary (#e11d2e), golden yellow accent (#ffc107), clean white
+  cards, bold headings. Manager, staff and Portal Admin panels use the same
+  theme. Backend, APIs, auth, plans, payments, approvals and reviews are
+  unchanged — only the frontend look changed. Animated counters, activity
+  chart, WebAudio click sounds and a voice-tour button (sound on/off toggle)
+  are kept.
+- Deploy note: if the app directory is not writable (for example on
+  SnapDeploy), the database and uploads fall back to a writable temp
+  directory (`/tmp/foodscope`); on a normal PC the original `foodscope.sqlite`
+  / `uploads/` paths are used. On such a host the database resets when the
+  container restarts and seed data recreates.
 
 ## Run locally (exact steps)
 
@@ -165,9 +160,9 @@ prepared SQL statements, foreign keys ON, WAL mode.
 ```
 server.js            All API + auth + validation
 package.json         start: node server.js
-public/index.html    SPA shell (yellow-theme dashboard, sidebar)
+public/index.html    SPA shell (food-app home: hero, category rail, card rows)
 public/app.js        SPA routes, counters, chart, sounds, voice tour
-public/styles.css    Yellow theme (see palette above)
+public/styles.css    Black/red/yellow food-app theme (see above)
 sql/schema.sql       SQLite schema (also applied by server.js on boot)
 .gitignore           Excludes .env, *.sqlite*, uploads/, node_modules/
 START_FOODSCOPE_APP.bat  Windows one-click start

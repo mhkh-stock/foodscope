@@ -53,12 +53,12 @@ function animateCounters(){
 function drawChart(canvas, labels, values){
   if(!canvas) return; const ctx=canvas.getContext('2d');
   const W=canvas.width=canvas.offsetWidth*2, H=canvas.height=440;
-  ctx.clearRect(0,0,W,H); ctx.fillStyle='rgba(31,25,9,.55)'; ctx.fillRect(0,0,W,H);
+  ctx.clearRect(0,0,W,H); ctx.fillStyle='#fff7ed'; ctx.fillRect(0,0,W,H);
   const max=Math.max(1,...values); const bw=W/(values.length*1.6);
   values.forEach((v,i)=>{ const h=(v/max)*(H-90); const x=20+i*(bw*1.6)+10;
-    ctx.fillStyle='#facc15'; ctx.fillRect(x,H-50-h,bw,h);
-    ctx.fillStyle='#fef9c3'; ctx.font='22px sans-serif'; ctx.fillText(String(v),x,H-60-h);
-    ctx.fillStyle='#c8b586'; ctx.font='20px sans-serif'; ctx.fillText(String(labels[i]).slice(5),x,H-18);
+    ctx.fillStyle='#e11d2e'; ctx.fillRect(x,H-50-h,bw,h);
+    ctx.fillStyle='#141414'; ctx.font='22px sans-serif'; ctx.fillText(String(v),x,H-60-h);
+    ctx.fillStyle='#6b7280'; ctx.font='20px sans-serif'; ctx.fillText(String(labels[i]).slice(5),x,H-18);
   });
 }
 function stars(n){ if(n==null) return '<span class="muted">No ratings yet</span>'; return '★'.repeat(Math.round(n))+'☆'.repeat(5-Math.round(n))+' '+n+'/5'; }
@@ -68,6 +68,9 @@ function setActiveNav(){
 }
 async function render(){
   setActiveNav(); await refreshMe();
+  const hero=document.getElementById('homeHero');
+  const hash0=location.hash.replace(/^#\//,'')||'';
+  if(hero) hero.hidden = !(hash0==='' );
   const hash=location.hash.replace(/^#\//,'')||'';
   const [route, param] = hash.split('/');
   try{
@@ -93,28 +96,58 @@ async function loadVendors(){
   const j=await fetch('/api/vendors?'+params.toString()).then(r=>r.json());
   vendorsCache=j.vendors||[]; return vendorsCache;
 }
-function vendorCard(v){
+
+window.scrollRail=(dir)=>{ const r=document.getElementById('catRail'); if(r) r.scrollBy({left:dir*320,behavior:'smooth'}); };
+window.setCity=(city)=>{ const c=document.getElementById('cityFilter'); if(c) c.value=city; document.querySelectorAll('#cityPills button').forEach(b=>b.classList.toggle('active', b.textContent.trim()===city || (city==='' && b.textContent.trim()==='All cities'))); renderHome(); };
+function priceRangeText(menu){
+  const prices=(menu||[]).map(m=>Number(m.price_pkr)).filter(n=>Number.isFinite(n));
+  if(!prices.length) return 'Prices on menu page';
+  const lo=Math.min(...prices), hi=Math.max(...prices);
+  return lo===hi ? ('PKR '+lo) : ('PKR '+lo+' – '+hi);
+}
+async function priceRangeFor(v){
+  try{ const j=await fetch('/api/vendors/'+v.id).then(r=>r.json()); if(j.vendor && j.vendor.menu) return priceRangeText(j.vendor.menu); }catch(e){}
+  return 'Prices on menu page';
+}
+function renderCatRail(cats){
+  const rail=document.getElementById('catRail'); if(!rail) return;
+  const sel=document.getElementById('catFilter') ? document.getElementById('catFilter').value : '';
+  const chips=['', ...cats].map(c=>`<button type="button" class="chip${sel===c?' active':''}" onclick="setCategory(${JSON.stringify(c)})">${c===''?'All':esc(c)}</button>`).join('');
+  rail.innerHTML=chips;
+}
+window.setCategory=(cat)=>{ const s=document.getElementById('catFilter'); if(s) s.value=cat; renderHome(); };
+function vendorCard(v, priceText){
   const img=v.primary_image_url||'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800';
+  const del = v.delivery_enabled ? (v.delivery_time ? esc(v.delivery_time) : 'Delivery available') : 'Dine-in / takeaway';
   return `<div class="vendor"><a href="#/vendor/${v.id}"><img src="${esc(img)}" alt=""></a><div class="body">
-    <h3 style="margin:0 0 6px"><a href="#/vendor/${v.id}">${esc(v.name)}</a></h3>
+    <h3><a href="#/vendor/${v.id}">${esc(v.name)}</a></h3>
     <div><span class="badge">${esc(v.category)}</span><span class="badge">${esc(v.city)}</span>${v.delivery_enabled?'<span class="badge">Delivery</span>':''}</div>
     <p class="muted">${esc(v.area||'')} · ${stars(v.ratings.overall)} (${v.ratings.count} reviews)</p>
-    <p>${esc((v.description||'').slice(0,120))}</p></div></div>`;
+    <p>${esc((v.description||'').slice(0,120))}</p>
+    <p><span class="price">${esc(priceText||'Prices on menu page')}</span> <span class="muted">· ${del}</span></p></div></div>`;
 }
 async function renderHome(){
   const cats=await fetch('/api/categories').then(r=>r.json()).catch(()=>({categories:[]}));
   const sel=document.getElementById('catFilter');
   if(sel && sel.options.length<=1) cats.categories.forEach(c=>{ const o=document.createElement('option'); o.value=c; o.textContent=c; sel.appendChild(o); });
+  renderCatRail(cats.categories||[]);
   const list=await loadVendors();
   const total=list.length;
-  app.innerHTML=`<h1>Find great food across Pakistan</h1><p class="muted">Approved vendors only. Prices in PKR. Search by dish, vendor or city.</p>
-  <div class="cards">
+  // Real PKR ranges from the existing vendor-detail endpoint (menu prices).
+  // No figure is invented: a failed detail fetch keeps the honest fallback.
+  const priceTexts = await Promise.all(list.map(v=>priceRangeFor(v)));
+  const cards = list.map((v,i)=>vendorCard(v, priceTexts[i]));
+  const top = cards.slice(0,5);
+  app.innerHTML=`<div class="cards">
     <div class="card"><div class="num" data-count="${total}">0</div><div class="lbl">Approved vendors listed</div></div>
     <div class="card"><div class="num" data-count="${list.reduce((a,v)=>a+v.ratings.count,0)}">0</div><div class="lbl">Customer reviews</div></div>
     <div class="card"><div class="num" data-count="${new Set(list.map(v=>v.city)).size}">0</div><div class="lbl">Cities covered</div></div>
   </div>
+  <h2 style="color:#fff">New on FoodScope</h2>
+  <div class="rail-row">${top.length?top.join(''):'<p class="muted">No vendors match those filters yet.</p>'}</div>
+  <h2 style="color:#fff">All places</h2>
+  <div class="grid">${cards.length?cards.join(''):'<p class="muted">No vendors match those filters yet.</p>'}</div>
   <div class="panel"><h3 style="margin-top:0">Activity: reviews per vendor</h3><canvas id="chart"></canvas><p class="muted">Live counts from the public directory.</p></div>
-  <div class="grid">${list.length?list.map(vendorCard).join(''):'<p class="muted">No vendors match those filters yet.</p>'}</div>
   <div class="panel"><h3>📬 FoodScope newsletter</h3><form onsubmit="subscribe(event)"><label>Email</label><input name="email" type="email" required placeholder="you@example.com"><button style="margin-top:10px">Subscribe</button><span id="nlMsg" class="muted"></span></form>
   <p class="muted" style="font-size:13px">Verification codes in development are shown on screen after registration — no real email or SMS is sent. See the README.</p></div>`;
   animateCounters();

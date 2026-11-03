@@ -12,11 +12,23 @@ const { DatabaseSync } = require('node:sqlite');
 
 const PORT = Number(process.env.PORT || 3010);
 const ROOT = __dirname;
-const DB_PATH = path.join(ROOT, 'foodscope.sqlite');
-const UPLOAD_DIR = path.join(ROOT, 'uploads');
+// Deploy-only writable-location fallback (no behaviour change on a normal PC):
+// on a local run ROOT is writable, so the original paths below are used exactly
+// as before. Only when ROOT cannot be written (e.g. SnapDeploy's /app, which
+// denied creating /app/uploads and /app/foodscope.sqlite) do the database and
+// uploads move to a writable temp directory. No API, schema or seed changes.
+const os = require('node:os');
+function writableBase() {
+  try { fs.accessSync(ROOT, fs.constants.W_OK); return ROOT; }
+  catch { return path.join(os.tmpdir(), 'foodscope'); }
+}
+const DATA_ROOT = writableBase();
+const DB_PATH = path.join(DATA_ROOT, 'foodscope.sqlite');
+const UPLOAD_DIR = path.join(DATA_ROOT, 'uploads');
 const PUBLIC_DIR = path.join(ROOT, 'public');
 const DEV = process.env.NODE_ENV !== 'production';
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+if (DATA_ROOT !== ROOT) console.log('FoodScope data directory (read-only app dir fallback):', DATA_ROOT);
 
 const db = new DatabaseSync(DB_PATH);
 db.exec("PRAGMA journal_mode=WAL;");
@@ -321,8 +333,9 @@ function serveStatic(req, res, pathname) {
   const full = path.join(PUBLIC_DIR, safe);
   if (!full.startsWith(PUBLIC_DIR) || !fs.existsSync(full) || fs.statSync(full).isDirectory()) {
     if (pathname.startsWith('/uploads/')) {
-      const uf = path.join(ROOT, path.normalize(pathname).replace(/^(\.\.[\/\\])+/, ''));
-      if (uf.startsWith(ROOT) && fs.existsSync(uf)) {
+      const rel = path.normalize(pathname).replace(/^(\.\.[\/\\])+/, '');
+      const uf = path.join(DATA_ROOT, rel);
+      if (uf.startsWith(DATA_ROOT) && fs.existsSync(uf)) {
         res.writeHead(200, { 'Content-Type': 'application/octet-stream' });
         fs.createReadStream(uf).pipe(res); return;
       }

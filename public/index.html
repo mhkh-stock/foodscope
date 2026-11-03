@@ -9,37 +9,63 @@
 <body>
 <header class="topbar">
   <div class="logo">🍽️ Food<span>Scope</span></div>
-  <input id="topSearch" placeholder="Search vendors, dishes, cities… (press Enter)">
-  <button class="ghost small" id="soundToggle" title="Sound on/off">🔊 Sound: On</button>
-  <button class="ghost small" id="tourBtn" title="Voice tour of the dashboard">🎙️ Voice Tour</button>
-  <span id="whoBox" class="muted"></span>
+  <nav class="topnav" aria-label="Main navigation">
+    <a href="#/" data-nav>Directory</a>
+    <a href="#/about" data-nav>About</a>
+    <a href="#/contact" data-nav>Contact</a>
+    <a href="#/privacy" data-nav>Privacy</a>
+    <a href="#/terms" data-nav>Terms</a>
+  </nav>
+  <div class="top-actions">
+    <button class="ghost small" id="soundToggle" title="Sound on/off">🔊 Sound: On</button>
+    <button class="ghost small" id="tourBtn" title="Voice tour of the dashboard">🎙️ Voice Tour</button>
+    <span id="whoBox" class="muted"></span>
+  </div>
 </header>
-<div class="layout">
-  <aside class="sidebar">
-    <h4>EXPLORE</h4>
-    <a href="#/" data-nav>🏠 Directory</a>
-    <a href="#/about" data-nav>ℹ️ About</a>
-    <a href="#/contact" data-nav>✉️ Contact</a>
-    <a href="#/privacy" data-nav>🔒 Privacy</a>
-    <a href="#/terms" data-nav>📜 Terms</a>
-    <h4>ACCOUNTS</h4>
-    <a href="#/login" data-nav>🔑 Log in</a>
-    <a href="#/register" data-nav>📝 Register</a>
-    <a href="#/manager" data-nav>🧑‍🍳 Manager Panel</a>
-    <a href="#/admin" data-nav>🛡️ Admin Panel</a>
-    <a href="#/account" data-nav>🔐 Change password</a>
-    <h4>FILTERS</h4>
-    <div style="padding:0 8px">
-      <label>Category</label>
-      <select id="catFilter"><option value="">All categories</option></select>
-      <label>City</label>
-      <input id="cityFilter" placeholder="e.g. Lahore">
-      <button class="small" style="margin-top:10px;width:100%" onclick="applyFilters()">Apply filters</button>
+
+<section class="hero" id="homeHero" hidden>
+  <div class="hero-inner">
+    <p class="hero-kicker">PAKISTAN'S FOOD DIRECTORY</p>
+    <h1>Good food, near you.</h1>
+    <p class="hero-sub">Approved restaurants, karahi houses, BBQ spots and sweet shops — across Pakistan. Prices in PKR.</p>
+    <div class="hero-search">
+      <input id="topSearch" placeholder="Search vendors, dishes, cities… (press Enter)">
+      <button class="small" onclick="applyFilters()">Search</button>
     </div>
-    <p class="muted" style="font-size:12px;padding:8px">FoodScope lists approved food businesses across Pakistan. Prices in PKR.</p>
-  </aside>
+    <div class="hero-filters">
+      <label class="sr-only" for="catFilter">Category</label>
+      <select id="catFilter"><option value="">All categories</option></select>
+      <label class="sr-only" for="cityFilter">City</label>
+      <input id="cityFilter" placeholder="City — e.g. Lahore">
+      <button class="small ghost" onclick="applyFilters()">Apply filters</button>
+    </div>
+    <div class="cat-rail-wrap">
+      <button class="rail-btn" type="button" aria-label="Scroll categories left" onclick="scrollRail(-1)">‹</button>
+      <div class="cat-rail" id="catRail" role="list"></div>
+      <button class="rail-btn" type="button" aria-label="Scroll categories right" onclick="scrollRail(1)">›</button>
+    </div>
+    <div class="city-pills" id="cityPills">
+      <button type="button" onclick="setCity('')">All cities</button>
+      <button type="button" onclick="setCity('Lahore')">Lahore</button>
+      <button type="button" onclick="setCity('Karachi')">Karachi</button>
+      <button type="button" onclick="setCity('Peshawar')">Peshawar</button>
+      <button type="button" onclick="setCity('Islamabad')">Islamabad</button>
+    </div>
+  </div>
+</section>
+
+<div class="layout">
   <main class="main" id="app"><p class="muted">Loading FoodScope…</p></main>
 </div>
+<footer class="footer">
+  <a href="#/" data-nav>Directory</a>
+  <a href="#/login" data-nav>Log in</a>
+  <a href="#/register" data-nav>Register</a>
+  <a href="#/manager" data-nav>Manager Panel</a>
+  <a href="#/admin" data-nav>Admin Panel</a>
+  <a href="#/account" data-nav>Change password</a>
+  <span class="muted">FoodScope lists approved food businesses across Pakistan. Prices in PKR.</span>
+</footer>
 <script src="/app.js"></script>
 </body>
 </html>
