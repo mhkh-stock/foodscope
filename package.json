@@ -1,0 +1,13 @@
+{
+  "name": "foodscope",
+  "version": "1.0.0",
+  "description": "FoodScope - Pakistani food-business directory",
+  "type": "commonjs",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

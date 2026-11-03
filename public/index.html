@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FoodScope — Pakistani Food Directory</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="logo">🍽️ Food<span>Scope</span></div>
+  <input id="topSearch" placeholder="Search vendors, dishes, cities… (press Enter)">
+  <button class="ghost small" id="soundToggle" title="Sound on/off">🔊 Sound: On</button>
+  <button class="ghost small" id="tourBtn" title="Voice tour of the dashboard">🎙️ Voice Tour</button>
+  <span id="whoBox" class="muted"></span>
+</header>
+<div class="layout">
+  <aside class="sidebar">
+    <h4>EXPLORE</h4>
+    <a href="#/" data-nav>🏠 Directory</a>
+    <a href="#/about" data-nav>ℹ️ About</a>
+    <a href="#/contact" data-nav>✉️ Contact</a>
+    <a href="#/privacy" data-nav>🔒 Privacy</a>
+    <a href="#/terms" data-nav>📜 Terms</a>
+    <h4>ACCOUNTS</h4>
+    <a href="#/login" data-nav>🔑 Log in</a>
+    <a href="#/register" data-nav>📝 Register</a>
+    <a href="#/manager" data-nav>🧑‍🍳 Manager Panel</a>
+    <a href="#/admin" data-nav>🛡️ Admin Panel</a>
+    <h4>FILTERS</h4>
+    <div style="padding:0 8px">
+      <label>Category</label>
+      <select id="catFilter"><option value="">All categories</option></select>
+      <label>City</label>
+      <input id="cityFilter" placeholder="e.g. Lahore">
+      <button class="small" style="margin-top:10px;width:100%" onclick="applyFilters()">Apply filters</button>
+    </div>
+    <p class="muted" style="font-size:12px;padding:8px">FoodScope lists approved food businesses across Pakistan. Prices in PKR.</p>
+  </aside>
+  <main class="main" id="app"><p class="muted">Loading FoodScope…</p></main>
+</div>
+<script src="/app.js"></script>
+</body>
+</html>
