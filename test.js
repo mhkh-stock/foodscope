@@ -319,7 +319,7 @@ async function runTests() {
 
   console.log('\n== admin: approve flow end-to-end ==');
   const admin = new Client();
-  r = await admin.post('/api/auth/login', { identifier: 'mhkh3200@gmail.com', password: 'FoodScope@2026!Admin' }, false);
+  r = await admin.post('/api/auth/login', { identifier: 'mhkh3200@gmail.com', password: '38fSK9yuWq6fRZwtk8szvvXp' }, false);
   eq('admin login = 200 owner', r.status === 200 && r.json.user.role === 'owner', true);
   r = await admin.get('/api/admin/reports');
   eq('reports totals vendors_total = 8', r.json.totals.vendors_total, 8);

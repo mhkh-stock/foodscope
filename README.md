@@ -64,15 +64,16 @@ all green.
 
 - Name: **M. Hashir**
 - Email: **mhkh3200@gmail.com**
-- Demo password: **FoodScope@2026!Admin**
 - Role: owner (Portal Admin)
 
-> ⚠️ This demo password is only for local setup. Change it after your first
-> login (or replace the seeded owner row) before any shared/public deployment.
+> ⚠️ Demo accounts exist for local setup only, with credentials set at seed
+> time. Change them after your first login (or replace the seeded owner row)
+> before any shared/public deployment.
 
-Seeded manager accounts (for testing) use password `Manager@2026!`
-(e.g. `chapli.house.peshawar@gmail.com`); seeded customer accounts use
-`Customer@2026!`. Seeded vendors include approved listings in Peshawar,
+Seeded manager accounts (for testing) exist
+(e.g. `chapli.house.peshawar@gmail.com`); seeded customer accounts exist too.
+Credentials are set at seed time — change them after first login. Seeded
+vendors include approved listings in Peshawar,
 Karachi (Burns Road), Lahore and Islamabad, plus two pending listings that
 correctly do **not** appear publicly.
 
@@ -80,9 +81,9 @@ correctly do **not** appear publicly.
 
 - Name: **M. Hashir**
 - Email: **mhkhan943223@gmail.com**
-- Password: **Manager@2026!** (change after first login)
 - Role: manager, verified, with **no vendor yet** — so this account can submit
   a vendor end-to-end (submit → payment → menu → admin approval → public).
+  Change its password after first login.
 
 ## Change password (admin, manager, customer, staff)
 
@@ -90,7 +91,7 @@ Log in, then open **Change password** in the sidebar (or `#/account`).
 Enter the old password and a new password of 8+ characters.
 The endpoint is `POST /api/auth/change-password` — authenticated only,
 CSRF-protected, old-password checked; it keeps your current session and
-revokes your other sessions. Demo passwords above must still be changed
+revokes your other sessions. Demo account passwords must still be changed
 after first login.
 
 ## Verification codes — development mode only

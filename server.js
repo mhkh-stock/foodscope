@@ -234,30 +234,30 @@ function seed() {
   const count = db.prepare('SELECT COUNT(*) c FROM users').get().c;
   if (count > 0) return;
   console.log('Seeding FoodScope...');
-  const adminId = createUserSeed({ name: 'M. Hashir', email: 'mhkh3200@gmail.com', contact_type: 'email', role: 'owner', password: 'FoodScope@2026!Admin', verified: 1 });
+  const adminId = createUserSeed({ name: 'M. Hashir', email: 'mhkh3200@gmail.com', contact_type: 'email', role: 'owner', password: '38fSK9yuWq6fRZwtk8szvvXp', verified: 1 });
   // Managers (one vendor each)
   const mgr = {};
-  mgr.chapli = createUserSeed({ name: 'Khan Bahadur', email: 'chapli.house.peshawar@gmail.com', contact_type: 'email', role: 'manager', password: 'Manager@2026!', verified: 1 });
-  mgr.burns = createUserSeed({ name: 'Syed Imran Ali', email: 'burns.nihari.karachi@gmail.com', contact_type: 'email', role: 'manager', password: 'Manager@2026!', verified: 1 });
-  mgr.lahore = createUserSeed({ name: 'Malik Naveed', email: 'lahore.karahi.house@gmail.com', contact_type: 'email', role: 'manager', password: 'Manager@2026!', verified: 1 });
-  mgr.isb = createUserSeed({ name: 'Ahmed Faraz', email: 'islamabad.grill@gmail.com', contact_type: 'email', role: 'manager', password: 'Manager@2026!', verified: 1 });
-  mgr.sweets = createUserSeed({ name: 'Haji Rafiq', email: 'sweet.palace.lahore@gmail.com', contact_type: 'email', role: 'manager', password: 'Manager@2026!', verified: 1 });
-  mgr.pending1 = createUserSeed({ name: 'Bilal Sheikh', email: 'bilal.fastfood.khi@gmail.com', contact_type: 'email', role: 'manager', password: 'Manager@2026!', verified: 1 });
-  mgr.pending2 = createUserSeed({ name: 'Usman Ghani', email: 'usman.chinese.isb@gmail.com', contact_type: 'email', role: 'manager', password: 'Manager@2026!', verified: 1 });
+  mgr.chapli = createUserSeed({ name: 'Khan Bahadur', email: 'chapli.house.peshawar@gmail.com', contact_type: 'email', role: 'manager', password: 'B864OQbtyWcSvUqQtB7d5ito', verified: 1 });
+  mgr.burns = createUserSeed({ name: 'Syed Imran Ali', email: 'burns.nihari.karachi@gmail.com', contact_type: 'email', role: 'manager', password: 'TmPk9xzo6WXYnDr+EEocGbG4', verified: 1 });
+  mgr.lahore = createUserSeed({ name: 'Malik Naveed', email: 'lahore.karahi.house@gmail.com', contact_type: 'email', role: 'manager', password: 'Fq2auEXLXxWtCxQCNdlmB2kC', verified: 1 });
+  mgr.isb = createUserSeed({ name: 'Ahmed Faraz', email: 'islamabad.grill@gmail.com', contact_type: 'email', role: 'manager', password: 'IYUOont7JTEyJTELrq92FmMy', verified: 1 });
+  mgr.sweets = createUserSeed({ name: 'Haji Rafiq', email: 'sweet.palace.lahore@gmail.com', contact_type: 'email', role: 'manager', password: '73iXkAlGVkYEqvPHzriq2rmQ', verified: 1 });
+  mgr.pending1 = createUserSeed({ name: 'Bilal Sheikh', email: 'bilal.fastfood.khi@gmail.com', contact_type: 'email', role: 'manager', password: 'ysGfnXfpwl1ANGiE2d17J3Xb', verified: 1 });
+  mgr.pending2 = createUserSeed({ name: 'Usman Ghani', email: 'usman.chinese.isb@gmail.com', contact_type: 'email', role: 'manager', password: 'wIbvcQ20BxdgGgdnWCh6wLSI', verified: 1 });
   // Required manager account (verified 2026-11-03 on the VM test copy, re-seeded here
   // so it works on a fresh DB). Intentionally has NO vendor yet, so the manager can
   // submit one end-to-end. Name is M. Hashir — the admin name is M. Hashir everywhere.
-  mgr.hashir = createUserSeed({ name: 'M. Hashir', email: 'mhkhan943223@gmail.com', contact_type: 'email', role: 'manager', password: 'Manager@2026!', verified: 1 });
+  mgr.hashir = createUserSeed({ name: 'M. Hashir', email: 'mhkhan943223@gmail.com', contact_type: 'email', role: 'manager', password: '3BLWb6FZ+gREIV5pOLxeQmet', verified: 1 });
   // Customers
   const cust = {};
   const customers = [
-    ['Ahmed Raza', 'ahmed.raza.khi@gmail.com'], ['Fatima Khan', 'fatima.khan.lhr@gmail.com'],
-    ['Bilal Hussain', 'bilal.hussain.psh@gmail.com'], ['Ayesha Siddiqui', 'ayesha.siddiqui.isb@gmail.com'],
-    ['Usman Tariq', 'usman.tariq.lhr@gmail.com'], ['Zainab Ali', 'zainab.ali.khi@gmail.com'],
-    ['Hassan Javed', 'hassan.javed.psh@gmail.com'], ['Maryam Nawaz', null],
+    ['Ahmed Raza', 'ahmed.raza.khi@gmail.com', '3hadIEWZ+EbSsnC4mOLa9G+z'], ['Fatima Khan', 'fatima.khan.lhr@gmail.com', 'qNIlIk7tDG8jt6BHFizAVHKu'],
+    ['Bilal Hussain', 'bilal.hussain.psh@gmail.com', 'NwxAn2Hl6iS0KUbYrD/cHPPf'], ['Ayesha Siddiqui', 'ayesha.siddiqui.isb@gmail.com', 'Czx5x+eLt/6pwVlVOu0CqjKp'],
+    ['Usman Tariq', 'usman.tariq.lhr@gmail.com', '80XZQLZ+2DdwTEZxW1Wp81HM'], ['Zainab Ali', 'zainab.ali.khi@gmail.com', 'M8jjTeCN7tkX/ujPCzQM5Ufz'],
+    ['Hassan Javed', 'hassan.javed.psh@gmail.com', '/7zuvMOYV1Fc9OhjsNIrmdjT'], ['Maryam Nawaz', null, 'PE/e0759AKomzDY3EuRxLdPE'],
   ];
-  for (const [n, e] of customers) {
-    cust[n] = createUserSeed({ name: n, email: e, phone: e ? null : '03001234567', contact_type: e ? 'email' : 'phone', role: 'customer', password: 'Customer@2026!', verified: 1 });
+  for (const [n, e, pw] of customers) {
+    cust[n] = createUserSeed({ name: n, email: e, phone: e ? null : '03001234567', contact_type: e ? 'email' : 'phone', role: 'customer', password: pw, verified: 1 });
   }
   const far = addDaysISO(120); // subscription comfortably in the future
   const insV = db.prepare(`INSERT INTO vendors (manager_id,name,slug,category,city,area,address,description,delivery_phone,google_maps_url,primary_image_url,banner_url,status,open,delivery_enabled,delivery_fee_pkr,min_order_pkr,delivery_time,subscription_plan,subscription_expires_at,approved_at)
