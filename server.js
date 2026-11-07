@@ -944,5 +944,5 @@ async function handle(req, res) {
 const server = http.createServer(handle);
 server.listen(PORT, () => {
   console.log(`FoodScope running at http://localhost:${PORT}`);
-  console.log(`Admin: mhkh3200@gmail.com (demo password documented in README / handoff — change it after first login)`);
+  console.log(`Admin: mhkh3200@gmail.com (seeded demo account — passwords are NOT documented in the README or anywhere else; change them after first login)`);
 });
