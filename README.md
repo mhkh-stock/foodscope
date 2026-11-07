@@ -42,6 +42,24 @@ Then open **http://localhost:3010**
 
 The database is created and seeded automatically on first run.
 
+## Tests
+
+```bat
+node test.js
+```
+
+Runs the full HTTP end-to-end suite (124 checks) against a **fresh temporary
+copy** of the app on port 3019, so the real `foodscope.sqlite` is never
+touched. Covers: approved-only public listing, search/category/city filters,
+ratings maths, one-review-per-vendor, review safety scan + visitor flagging
+(rate-limited: 5 flags per 30 min per IP), customer/manager OTP login,
+change-password revoking other sessions, cross-manager isolation (a manager
+cannot attach payments/certificates to another manager's vendor), menu and
+fee validation (no negative PKR prices), the full admin approve → pay →
+public flow, suspend/unsuspend (a never-approved vendor returns to pending,
+never to approved), rejected-vendor resubmit, and audit logging. Exit 0 =
+all green.
+
 ## Portal Admin login (demo — CHANGE AFTER FIRST LOGIN)
 
 - Name: **M. Hashir**
@@ -97,7 +115,9 @@ rate-limited: contact 4 per 30 min, newsletter 5 per 30 min (per IP).
 ### Customers
 Register with **exactly one** contact channel — email OR phone, never both.
 Verify with a 6-digit code, 30-day session, one active review per vendor.
-Visitors (logged in or not) can flag reviews for moderation.
+Visitors (logged in or not) can flag reviews for moderation — 5 flags per
+30 minutes per IP, so one visitor cannot mass-flag reviews out of the
+public averages.
 
 ### Managers
 Register, verify, then log in with an OTP code. Subscription plans:
@@ -106,15 +126,20 @@ PKR 9,000. Payment methods: Bank Transfer, Easypaisa, JazzCash, Sadapay,
 Nayapay, Manual Reference. Payment proof and legal certificate uploads
 accept PNG/JPEG/PDF only, with MIME + file-signature + 5 MB size checks,
 stored under `uploads/` (git-ignored). Exactly **one** vendor submission
-per manager. Vendor lifecycle: pending → approved → pending_update →
+per manager — except a rejected vendor, which the manager may resubmit from
+scratch. A payment or certificate may only name the manager's own vendor.
+Vendor lifecycle: pending → approved → pending_update →
 rejected / suspended. Sensitive fields (name, Google Maps URL, delivery
 phone, primary image URL, banner URL, slug) change only via admin-approved
-update requests. An expired subscription hides/locks the listing until renewal.
+update requests; all other details (description, area, address, city,
+category, open/closed, delivery fee, minimum order, delivery time) are
+editable directly from the manager panel. An expired subscription hides/locks the listing until renewal.
 
 ### Portal Admin (owner)
 Approve/reject payments, certificates, vendors, updates and images; suspend
-vendors; platform reports (totals, top 5 by rating, top 5 by review count,
-category totals); audit log; manage manager accounts (suspend/activate);
+vendors (unsuspend returns a never-approved vendor to pending, not to
+approved); platform reports (totals, top 5 by rating, top 5 by review count,
+category totals, reviews-per-day activity); audit log; manage manager accounts (suspend/activate);
 emergency vendor edit/delete — both require a safety reason and are
 audit-logged.
 
@@ -159,6 +184,7 @@ prepared SQL statements, foreign keys ON, WAL mode.
 
 ```
 server.js            All API + auth + validation
+test.js              Full HTTP end-to-end suite (fresh temp copy, port 3019)
 package.json         start: node server.js
 public/index.html    SPA shell (food-app home: hero, category rail, card rows)
 public/app.js        SPA routes, counters, chart, sounds, voice tour

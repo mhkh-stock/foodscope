@@ -432,6 +432,7 @@ async function handle(req, res) {
         if (!u.verified) return sendJSON(res, 403, { error: 'Account not verified. Enter the verification code first.', need_verification: true });
         if (u.role === 'manager') {
           // OTP-verified login for managers
+          for (const [k, rec] of loginOtpStore) if (rec.expiresAt < Date.now()) loginOtpStore.delete(k); // prune expired OTPs
           const code = randCode();
           const loginToken = randToken(24);
           loginOtpStore.set(loginToken, { userId: u.id, codeHash: sha256(code), expiresAt: Date.now() + 15 * 60000 });
@@ -543,6 +544,9 @@ async function handle(req, res) {
       }
       const flagMatch = pathname.match(/^\/api\/reviews\/(\d+)\/flag$/);
       if (method === 'POST' && flagMatch) {
+        // One anonymous flag immediately pulls a review out of the public
+        // averages, so cap flagging per IP (5 per 30 min) to stop mass-flag abuse.
+        if (!rateLimit(ip, 'flag', 5, 30 * 60000)) return sendJSON(res, 429, { error: 'Too many flags. Please try again later.' });
         const { user } = getSessionUser(req);
         const r = db.prepare('SELECT * FROM reviews WHERE id=?').get(Number(flagMatch[1]));
         if (!r) return sendJSON(res, 404, { error: 'Review not found' });
@@ -567,9 +571,21 @@ async function handle(req, res) {
           return sendJSON(res, 200, { vendor: out });
         }
         if (method === 'POST' && pathname === '/api/manager/vendors') {
-          if (myVendor()) return sendJSON(res, 409, { error: 'You already have one vendor submission. Use update requests to change sensitive fields.' });
+          const existing = myVendor();
+          if (existing && existing.status !== 'rejected')
+            return sendJSON(res, 409, { error: 'You already have one vendor submission. Use update requests to change sensitive fields.' });
+          if (existing) {
+            // A rejected vendor can be resubmitted from scratch: the old row
+            // (menu/gallery/update-requests cascade) is removed first so the
+            // manager is not stuck forever with a dead listing.
+            audit(auth.user, 'vendor_resubmit_after_reject', 'vendor', existing.id, null, { name: existing.name });
+            db.prepare('DELETE FROM vendors WHERE id=?').run(existing.id);
+          }
           const { name, category, city, area, address, description, delivery_phone, google_maps_url, primary_image_url, banner_url, delivery_enabled, delivery_fee_pkr, min_order_pkr, delivery_time } = body;
           if (!name || !CATEGORIES.includes(category) || !city) return sendJSON(res, 400, { error: 'Name, valid category and city are required' });
+          if ((delivery_fee_pkr !== undefined && (!Number.isFinite(Number(delivery_fee_pkr)) || Number(delivery_fee_pkr) < 0)) ||
+              (min_order_pkr !== undefined && (!Number.isFinite(Number(min_order_pkr)) || Number(min_order_pkr) < 0)))
+            return sendJSON(res, 400, { error: 'Delivery fee and minimum order must be 0 or more PKR' });
           let slug = slugify(body.slug || name);
           let base = slug, n = 2;
           while (db.prepare('SELECT id FROM vendors WHERE slug=?').get(slug)) slug = base + '-' + (n++);
@@ -585,6 +601,10 @@ async function handle(req, res) {
           if (v.status === 'suspended') return sendJSON(res, 403, { error: 'Suspended vendor is locked until admin review' });
           const bad = Object.keys(body).filter((k) => SENSITIVE_FIELDS.includes(k));
           if (bad.length) return sendJSON(res, 400, { error: 'Sensitive fields must go through an update request: ' + bad.join(', ') });
+          for (const k of ['delivery_fee_pkr', 'min_order_pkr']) {
+            if (body[k] !== undefined && (!Number.isFinite(Number(body[k])) || Number(body[k]) < 0))
+              return sendJSON(res, 400, { error: 'Delivery fee and minimum order must be 0 or more PKR' });
+          }
           const sets = [], vals = [];
           for (const k of NON_SENSITIVE_VENDOR_FIELDS) {
             if (body[k] !== undefined) { sets.push(k + '=?'); vals.push(k === 'open' || k === 'delivery_enabled' ? (body[k] ? 1 : 0) : body[k]); }
@@ -625,8 +645,16 @@ async function handle(req, res) {
             proof = saved;
           }
           const v = myVendor();
+          // A supplied vendor_id must belong to this manager — never trust a
+          // body id to attach a payment to someone else's vendor.
+          let vendorId = v ? v.id : null;
+          if (vendor_id !== undefined && vendor_id !== null && vendor_id !== '') {
+            const target = db.prepare('SELECT * FROM vendors WHERE id=? AND manager_id=?').get(Number(vendor_id), auth.user.id);
+            if (!target) return sendJSON(res, 403, { error: 'That vendor does not belong to your account' });
+            vendorId = target.id;
+          }
           const r = db.prepare('INSERT INTO payments (manager_id,vendor_id,plan,amount_pkr,method,reference_text,proof_path,proof_mimetype) VALUES (?,?,?,?,?,?,?,?)')
-            .run(auth.user.id, vendor_id ? Number(vendor_id) : (v ? v.id : null), plan, PLANS[plan].price, method, reference_text || '', proof ? proof.path : null, proof ? proof.mimetype : null);
+            .run(auth.user.id, vendorId, plan, PLANS[plan].price, method, reference_text || '', proof ? proof.path : null, proof ? proof.mimetype : null);
           audit(auth.user, 'payment_submit', 'payment', Number(r.lastInsertRowid), null, { plan, method });
           return sendJSON(res, 201, { ok: true, paymentId: Number(r.lastInsertRowid), amount_pkr: PLANS[plan].price, status: 'pending' });
         }
@@ -639,15 +667,23 @@ async function handle(req, res) {
             if (saved.error) return sendJSON(res, 400, { error: saved.error });
           }
           const v = myVendor();
+          // Same ownership rule as payments: a supplied vendor_id must be
+          // this manager's own vendor.
+          let vendorId = v ? v.id : null;
+          if (vendor_id !== undefined && vendor_id !== null && vendor_id !== '') {
+            const target = db.prepare('SELECT * FROM vendors WHERE id=? AND manager_id=?').get(Number(vendor_id), auth.user.id);
+            if (!target) return sendJSON(res, 403, { error: 'That vendor does not belong to your account' });
+            vendorId = target.id;
+          }
           const r = db.prepare('INSERT INTO certificates (manager_id,vendor_id,cert_type,file_path,file_mimetype) VALUES (?,?,?,?,?)')
-            .run(auth.user.id, vendor_id ? Number(vendor_id) : (v ? v.id : null), cert_type, saved ? saved.path : null, saved ? saved.mimetype : null);
+            .run(auth.user.id, vendorId, cert_type, saved ? saved.path : null, saved ? saved.mimetype : null);
           audit(auth.user, 'certificate_submit', 'certificate', Number(r.lastInsertRowid), null, { cert_type });
           return sendJSON(res, 201, { ok: true, certificateId: Number(r.lastInsertRowid), status: 'pending' });
         }
         if (method === 'POST' && pathname === '/api/manager/menu') {
           const v = myVendor(); if (!v) return sendJSON(res, 404, { error: 'Submit a vendor first' });
           const { name, description, price_pkr, category, image_url } = body;
-          if (!name || price_pkr == null || Number(price_pkr) < 0) return sendJSON(res, 400, { error: 'Menu name and non-negative PKR price required' });
+          if (!name || price_pkr == null || !Number.isFinite(Number(price_pkr)) || Number(price_pkr) < 0) return sendJSON(res, 400, { error: 'Menu name and non-negative PKR price required' });
           const r = db.prepare('INSERT INTO menu_items (vendor_id,name,description,price_pkr,category,image_url) VALUES (?,?,?,?,?,?)').run(v.id, name, description || '', Number(price_pkr), category || '', image_url || '');
           return sendJSON(res, 201, { ok: true, menuId: Number(r.lastInsertRowid) });
         }
@@ -657,6 +693,8 @@ async function handle(req, res) {
           const m = db.prepare('SELECT * FROM menu_items WHERE id=? AND vendor_id=?').get(Number(menuMatch[1]), v.id);
           if (!m) return sendJSON(res, 404, { error: 'Menu item not found' });
           if (method === 'DELETE') { db.prepare('DELETE FROM menu_items WHERE id=?').run(m.id); return sendJSON(res, 200, { ok: true }); }
+          if (body.price_pkr !== undefined && (!Number.isFinite(Number(body.price_pkr)) || Number(body.price_pkr) < 0))
+            return sendJSON(res, 400, { error: 'Menu price must be 0 or more PKR' });
           const sets = [], vals = [];
           for (const k of ['name', 'description', 'price_pkr', 'category', 'image_url', 'available']) {
             if (body[k] !== undefined) { sets.push(k + '=?'); vals.push(k === 'available' ? (body[k] ? 1 : 0) : body[k]); }
@@ -696,7 +734,7 @@ async function handle(req, res) {
           return sendJSON(res, 200, { vendor: v, menu });
         }
         if (method === 'POST' && pathname === '/api/staff/menu') {
-          if (!body.name || body.price_pkr == null) return sendJSON(res, 400, { error: 'Name and price required' });
+          if (!body.name || body.price_pkr == null || !Number.isFinite(Number(body.price_pkr)) || Number(body.price_pkr) < 0) return sendJSON(res, 400, { error: 'Name and non-negative PKR price required' });
           const r = db.prepare('INSERT INTO menu_items (vendor_id,name,description,price_pkr,category,image_url) VALUES (?,?,?,?,?,?)').run(vendorId, body.name, body.description || '', Number(body.price_pkr), body.category || '', body.image_url || '');
           return sendJSON(res, 201, { ok: true, menuId: Number(r.lastInsertRowid) });
         }
@@ -705,6 +743,8 @@ async function handle(req, res) {
           const m = db.prepare('SELECT * FROM menu_items WHERE id=? AND vendor_id=?').get(Number(sm[1]), vendorId);
           if (!m) return sendJSON(res, 404, { error: 'Menu item not found for assigned vendor' });
           if (method === 'DELETE') { db.prepare('DELETE FROM menu_items WHERE id=?').run(m.id); return sendJSON(res, 200, { ok: true }); }
+          if (body.price_pkr !== undefined && (!Number.isFinite(Number(body.price_pkr)) || Number(body.price_pkr) < 0))
+            return sendJSON(res, 400, { error: 'Menu price must be 0 or more PKR' });
           const sets = [], vals = [];
           for (const k of ['name', 'description', 'price_pkr', 'category', 'image_url', 'available']) {
             if (body[k] !== undefined) { sets.push(k + '=?'); vals.push(k === 'available' ? (body[k] ? 1 : 0) : body[k]); }
@@ -735,7 +775,11 @@ async function handle(req, res) {
             if (!body.reason) return sendJSON(res, 400, { error: 'Suspension reason required' });
             db.prepare("UPDATE vendors SET status='suspended', suspension_reason=? WHERE id=?").run(body.reason, v.id);
           } else {
-            db.prepare("UPDATE vendors SET status='approved', suspension_reason=NULL WHERE id=?").run(v.id);
+            // Unsuspend restores the vendor to approved ONLY if it was
+            // approved before; a never-approved vendor goes back to pending
+            // instead of silently becoming "approved" without an approval.
+            if (v.approved_at) db.prepare("UPDATE vendors SET status='approved', suspension_reason=NULL WHERE id=?").run(v.id);
+            else db.prepare("UPDATE vendors SET status='pending', suspension_reason=NULL WHERE id=?").run(v.id);
           }
           audit(auth.user, 'vendor_' + action, 'vendor', v.id, body.reason || null, null);
           return sendJSON(res, 200, { ok: true });
@@ -746,6 +790,8 @@ async function handle(req, res) {
           if (!v) return sendJSON(res, 404, { error: 'Vendor not found' });
           if (!body.reason || String(body.reason).trim().length < 5) return sendJSON(res, 400, { error: 'Emergency edit requires a safety reason (5+ chars)' });
           const allowed = [...SENSITIVE_FIELDS, ...NON_SENSITIVE_VENDOR_FIELDS, 'status'];
+          if (body.fields && body.fields.status !== undefined && !['pending', 'approved', 'pending_update', 'rejected', 'suspended'].includes(body.fields.status))
+            return sendJSON(res, 400, { error: 'Invalid vendor status' });
           const sets = [], vals = [];
           for (const k of allowed) if (body.fields && body.fields[k] !== undefined) { sets.push(k + '=?'); vals.push(body.fields[k]); }
           if (!sets.length) return sendJSON(res, 400, { error: 'No fields to edit' });
@@ -795,6 +841,12 @@ async function handle(req, res) {
           if (!r) return sendJSON(res, 404, { error: 'Update request not found' });
           if (upd[2] === 'approve') {
             const fields = JSON.parse(r.fields_json);
+            // Re-check slug uniqueness at approval time, not just at request
+            // time — another vendor may have taken the slug since.
+            if (fields.slug) {
+              const clash = db.prepare('SELECT id FROM vendors WHERE slug=? AND id!=?').get(slugify(fields.slug), r.vendor_id);
+              if (clash) return sendJSON(res, 400, { error: 'Slug already in use by another vendor — reject this request and ask the manager to choose another slug' });
+            }
             const sets = [], vals = [];
             for (const k of SENSITIVE_FIELDS) if (fields[k] !== undefined) { sets.push(k + '=?'); vals.push(fields[k]); }
             if (sets.length) db.prepare(`UPDATE vendors SET ${sets.join(',')}, updated_at=datetime('now') WHERE id=?`).run(...vals, r.vendor_id);

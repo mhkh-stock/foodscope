@@ -58,7 +58,7 @@ function drawChart(canvas, labels, values){
   values.forEach((v,i)=>{ const h=(v/max)*(H-90); const x=20+i*(bw*1.6)+10;
     ctx.fillStyle='#e11d2e'; ctx.fillRect(x,H-50-h,bw,h);
     ctx.fillStyle='#141414'; ctx.font='22px sans-serif'; ctx.fillText(String(v),x,H-60-h);
-    ctx.fillStyle='#6b7280'; ctx.font='20px sans-serif'; ctx.fillText(String(labels[i]).slice(5),x,H-18);
+    ctx.fillStyle='#6b7280'; ctx.font='20px sans-serif'; ctx.fillText(String(labels[i]).slice(0,12),x,H-18);
   });
 }
 function stars(n){ if(n==null) return '<span class="muted">No ratings yet</span>'; return '★'.repeat(Math.round(n))+'☆'.repeat(5-Math.round(n))+' '+n+'/5'; }
@@ -132,6 +132,11 @@ async function renderHome(){
   if(sel && sel.options.length<=1) cats.categories.forEach(c=>{ const o=document.createElement('option'); o.value=c; o.textContent=c; sel.appendChild(o); });
   renderCatRail(cats.categories||[]);
   const list=await loadVendors();
+  const sortSel=document.getElementById('sortSel');
+  const sort=sortSel?sortSel.value:'';
+  if(sort==='rating') list.sort((a,b)=>(b.ratings.overall??-1)-(a.ratings.overall??-1));
+  else if(sort==='reviews') list.sort((a,b)=>b.ratings.count-a.ratings.count);
+  else if(sort==='name') list.sort((a,b)=>a.name.localeCompare(b.name));
   const total=list.length;
   // Real PKR ranges from the existing vendor-detail endpoint (menu prices).
   // No figure is invented: a failed detail fetch keeps the honest fallback.
@@ -155,6 +160,7 @@ async function renderHome(){
 }
 window.applyFilters=()=>renderHome();
 document.getElementById('topSearch').addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); renderHome(); } });
+document.getElementById('sortSel').addEventListener('change',()=>renderHome());
 window.subscribe=async(e)=>{ e.preventDefault(); const email=e.target.email.value;
   try{ const j=await api('POST','/api/newsletter',{email}); document.getElementById('nlMsg').textContent=' ✓ '+j.message; }
   catch(err){ document.getElementById('nlMsg').textContent=' ✗ '+err.message; } };
@@ -173,6 +179,7 @@ async function renderVendor(id){
     <div class="card"><div class="num">${v.ratings.food??'—'}</div><div class="lbl">Food</div></div>
     <div class="card"><div class="num">${v.ratings.hygiene??'—'}</div><div class="lbl">Hygiene</div></div>
     <div class="card"><div class="num">${v.ratings.value??'—'}</div><div class="lbl">Value</div></div>
+    ${v.delivery_enabled?`<div class="card"><div class="num">${v.ratings.delivery??'—'}</div><div class="lbl">Delivery (${v.ratings.count} reviews)</div></div>`:''}
   </div>
   <div class="panel"><h3>Menu (PKR)</h3>${v.menu.length?v.menu.map(m=>`<div class="menu-item"><span><b>${esc(m.name)}</b><br><span class="muted">${esc(m.description||'')}</span></span><span class="price">PKR ${m.price_pkr} ${m.available?'':'· unavailable'}</span></div>`).join(''):'<p class="muted">Menu coming soon.</p>'}</div>
   <div class="panel"><h3>Gallery</h3>${v.gallery.length?v.gallery.map(g=>`<img src="${esc(g.url)}" style="width:220px;height:150px;object-fit:cover;border-radius:12px;margin:4px" alt="">`).join(''):'<p class="muted">No gallery photos yet.</p>'}</div>
@@ -296,15 +303,37 @@ async function renderManager(){
     return;
   }
   const v=j.vendor;
+  // Plan prices come from the server so the panel can never drift from the
+  // prices the API actually charges.
+  const plansJ=await fetch('/api/plans').then(r=>r.json()).catch(()=>null);
+  const planLine=plansJ&&plansJ.plans
+    ? Object.entries(plansJ.plans).map(([n,p])=>`${n} ${p.days} days PKR ${p.price.toLocaleString()}`).join(' · ')
+    : 'Basic 30 days PKR 1,500 · Premium 90 days PKR 4,500 · Featured 90 days PKR 9,000';
+  const catOpts=['Desi','BBQ','Karahi','Fast Food','Sweets','Chinese','Bakery','Beverages']
+    .map(c=>`<option${c===v.category?' selected':''}>${c}</option>`).join('');
   app.innerHTML=`<h1>Manager Panel — ${esc(v.name)}</h1>
   <p><span class="badge">${esc(v.status)}</span> <span class="badge">${esc(v.subscription_plan||'No plan yet')}</span> ${v.subscription_expires_at?`<span class="badge">Subscription until ${esc(v.subscription_expires_at.slice(0,10))}</span>`:''}</p>
   <div class="cards"><div class="card"><div class="num">${v.menu.length}</div><div class="lbl">Menu items</div></div><div class="card"><div class="num">${v.reviews.length}</div><div class="lbl">Reviews</div></div><div class="card"><div class="num">${v.payments.filter(p=>p.status==='approved').reduce((a,p)=>a+p.amount_pkr,0)}</div><div class="lbl">PKR approved payments</div></div></div>
+  <div class="panel"><h3>Edit details</h3><p class="muted">Description, area, address, city, category, open/closed and delivery settings change here instantly. Name, maps link, delivery phone, images and slug need an admin-approved update request below.</p>
+  <form onsubmit="editDetails(event,${v.id})">
+    <div class="row"><div><label>Category</label><select name="category">${catOpts}</select></div>
+    <div><label>City</label><input name="city" value="${esc(v.city)}" required></div></div>
+    <label>Area</label><input name="area" value="${esc(v.area||'')}">
+    <label>Address</label><input name="address" value="${esc(v.address||'')}">
+    <label>Description</label><textarea name="description" rows="3">${esc(v.description||'')}</textarea>
+    <div class="row"><div><label><input type="checkbox" name="open" style="width:auto"${v.open?' checked':''}> Open now</label></div>
+    <div><label><input type="checkbox" name="delivery_enabled" style="width:auto"${v.delivery_enabled?' checked':''}> Delivery enabled</label></div>
+    <div><label>Delivery fee (PKR)</label><input name="delivery_fee_pkr" type="number" min="0" value="${v.delivery_fee_pkr||0}"></div>
+    <div><label>Min order (PKR)</label><input name="min_order_pkr" type="number" min="0" value="${v.min_order_pkr||0}"></div></div>
+    <label>Delivery time (e.g. 30-45 min)</label><input name="delivery_time" value="${esc(v.delivery_time||'')}">
+    <button style="margin-top:10px">Save details</button><span id="edMsg" class="muted"></span></form>
+    ${v.status==='approved'?'<p class="muted">Note: saving details on an approved listing moves it to “pending update” until the admin re-approves it — it stays visible meanwhile.</p>':''}</div>
   <div class="panel"><h3>Subscription payment</h3><form onsubmit="payPlan(event,${v.id})">
     <div class="row"><div><label>Plan</label><select name="plan"><option>Basic</option><option>Premium</option><option>Featured</option></select></div>
     <div><label>Method</label><select name="method"><option>Bank Transfer</option><option>Easypaisa</option><option>JazzCash</option><option>Sadapay</option><option>Nayapay</option><option>Manual Reference</option></select></div>
     <div><label>Reference / transaction ID</label><input name="reference_text" required></div></div>
     <label>Payment proof file (PNG/JPEG/PDF, under 5 MB, optional)</label><input name="proof_file" type="file" accept=".png,.jpg,.jpeg,.pdf">
-    <p class="muted">Basic 30 days PKR 1,500 · Premium 90 days PKR 4,500 · Featured 90 days PKR 9,000. Proof is checked by MIME type and file signature on the server.</p>
+    <p class="muted">${esc(planLine)}. Proof is checked by MIME type and file signature on the server.</p>
     <button>Submit payment</button><span id="payMsg" class="muted"></span></form>
     <h4>Payments</h4>${v.payments.map(p=>`<p>${esc(p.plan)} — PKR ${p.amount_pkr} — ${esc(p.method)} — ${esc(p.status)}</p>`).join('')||'<p class="muted">No payments yet.</p>'}</div>
   <div class="panel"><h3>Sensitive-field update request</h3><p class="muted">Name, Google Maps URL, delivery phone, image URLs and slug can only change after admin approval.</p>
@@ -318,6 +347,10 @@ async function renderManager(){
   <h4>Gallery</h4>${v.gallery.map(g=>`<p>${esc(g.url.slice(0,60))} — ${esc(g.status)}</p>`).join('')||'<p class="muted">No gallery photos yet.</p>'}</div>
   <div class="panel"><h3>Add staff (menu/availability only, for this vendor)</h3><form onsubmit="addStaff(event)"><label>Staff name</label><input name="name" required><label>Staff email</label><input name="email" type="email" required><label>Staff password (8+ characters)</label><input name="password" type="password" required><button style="margin-top:10px">Add staff</button><span id="staffMsg" class="muted"></span></form>
   <p class="muted">Staff can only manage menu and availability for this vendor — never vendor details, payments or admin routes.</p></div>`;
+  window.editDetails=async(e,id)=>{ e.preventDefault(); const f=e.target;
+    try{ await api('PATCH','/api/manager/vendors/'+id,{category:f.category.value,city:f.city.value,area:f.area.value,address:f.address.value,description:f.description.value,open:f.open.checked,delivery_enabled:f.delivery_enabled.checked,delivery_fee_pkr:+f.delivery_fee_pkr.value,min_order_pkr:+f.min_order_pkr.value,delivery_time:f.delivery_time.value});
+      document.getElementById('edMsg').textContent=' ✓ Details saved.'; renderManager(); }
+    catch(err){ document.getElementById('edMsg').textContent=' ✗ '+err.message; } };
   window.payPlan=async(e,id)=>{ e.preventDefault(); const f=e.target;
     try{ const body={plan:f.plan.value,method:f.method.value,reference_text:f.reference_text.value,vendor_id:id};
       const file=f.proof_file.files[0];
@@ -343,10 +376,11 @@ async function renderManager(){
 async function renderAdmin(){
   if(!me){ app.innerHTML='<p>Please <a href="#/login">log in</a> as the Portal Admin first.</p>'; return; }
   if(me.role!=='owner'){ app.innerHTML='<div class="err">Admin panel is for the Portal Admin (owner) only. Your role: '+esc(me.role)+'</div>'; return; }
-  const [rep, vendors, pays, reqs, reviews, auditLog, certs, gallery, users, contacts] = await Promise.all([
+  const [rep, vendors, pays, reqs, reviews, auditLog, certs, gallery, users, contacts, activity] = await Promise.all([
     api('GET','/api/admin/reports'), api('GET','/api/admin/vendors'), api('GET','/api/admin/payments'),
     api('GET','/api/admin/update-requests'), api('GET','/api/admin/reviews'), api('GET','/api/admin/audit-log'),
     api('GET','/api/admin/certificates'), api('GET','/api/admin/gallery'), api('GET','/api/admin/users'), api('GET','/api/admin/contacts'),
+    api('GET','/api/admin/activity'),
   ]).catch(e=>{ app.innerHTML=`<div class="err">${esc(e.message)}</div>`; return []; });
   if(!rep) return;
   const t=rep.totals;
@@ -358,6 +392,7 @@ async function renderAdmin(){
     <div class="card"><div class="num" data-count="${t.reviews_active}">0</div><div class="lbl">Active reviews</div></div>
     <div class="card"><div class="num" data-count="${t.payments_approved_total_pkr}">0</div><div class="lbl">PKR approved payments</div></div>
   </div>
+  <div class="panel"><h3>Recent activity — reviews per day (last 14 days)</h3><p>${activity.activity.map(a=>`${esc(a.d)}: ${a.n}`).join(' · ')||'No reviews yet.'}</p></div>
   <div class="panel"><h3>Top 5 by rating</h3><table><tr><th>Vendor</th><th>City</th><th>Avg</th><th>Reviews</th></tr>${rep.top_by_rating.map(x=>`<tr><td>${esc(x.name)}</td><td>${esc(x.city)}</td><td>${x.avg_overall}</td><td>${x.n}</td></tr>`).join('')||'<tr><td colspan="4">No rated vendors yet</td></tr>'}</table>
   <h3>Top 5 by review count</h3><table><tr><th>Vendor</th><th>City</th><th>Reviews</th><th>Avg</th></tr>${rep.top_by_review_count.map(x=>`<tr><td>${esc(x.name)}</td><td>${esc(x.city)}</td><td>${x.n}</td><td>${x.avg_overall}</td></tr>`).join('')||'<tr><td colspan="4">None yet</td></tr>'}</table>
   <h3>Category totals</h3><p>${rep.category_totals.map(c=>`${esc(c.category)}: ${c.n}`).join(' · ')}</p></div>
